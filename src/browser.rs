@@ -18,6 +18,10 @@ pub struct ChromeBrowser {
 
 impl ChromeBrowser {
     pub async fn new(headless: bool) -> Result<Self> {
+        Self::new_with_size(headless, 1280, 1024).await
+    }
+    
+    pub async fn new_with_size(headless: bool, width: u32, height: u32) -> Result<Self> {
         let chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
         let port = 9222 + (rand::random::<u32>() % 1000) as u16;
         let user_data_dir = format!("/tmp/chrome_hca_{}", port);
@@ -52,7 +56,7 @@ impl ChromeBrowser {
                 "--disable-sync".to_string(),
                 "--disable-default-browser-check".to_string(),
                 "--disable-features=TranslateUI,BlinkGenPropertyTrees".to_string(),
-                "--window-size=1280,1024".to_string(),
+                format!("--window-size={},{}", width, height).to_string(),
                 "--force-device-scale-factor=1".to_string(),
                 "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36".to_string(),
                 "about:blank".to_string(),

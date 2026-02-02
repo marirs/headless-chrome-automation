@@ -9,7 +9,15 @@
 //! 
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
+//!     // Default browser (1280x1024)
 //!     let mut browser = create_browser().await?;
+//!     
+//!     // Custom size browser (1280x720)
+//!     let mut browser = create_browser_with_size(1280, 720).await?;
+//!     
+//!     // Custom size and headless mode
+//!     let mut browser = create_browser_with_config(false, 1920, 1080).await?;
+//!     
 //!     let mut scraper = create_scraper(&mut browser);
 //!     
 //!     browser.navigate_to("https://example.com").await?;
@@ -86,10 +94,21 @@ impl HCA {
     }
 }
 
-/// Convenience function to create a browser instance
+/// Convenience function to create a browser instance with default size (1280x1024)
 pub async fn create_browser() -> anyhow::Result<ChromeBrowser> {
     let hca = HCA::new();
     ChromeBrowser::new(hca.config.headless).await
+}
+
+/// Convenience function to create a browser instance with custom window size
+pub async fn create_browser_with_size(width: u32, height: u32) -> anyhow::Result<ChromeBrowser> {
+    let hca = HCA::new();
+    ChromeBrowser::new_with_size(hca.config.headless, width, height).await
+}
+
+/// Convenience function to create a browser instance with custom size and headless mode
+pub async fn create_browser_with_config(headless: bool, width: u32, height: u32) -> anyhow::Result<ChromeBrowser> {
+    ChromeBrowser::new_with_size(headless, width, height).await
 }
 
 /// Convenience function to create a web scraper

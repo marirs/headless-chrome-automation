@@ -81,9 +81,16 @@ use hca::create_browser;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Default browser (1280x1024)
     let mut browser = create_browser().await?;
+  
+    // Custom size (1280x720)
+    let mut browser = create_browser_with_size(1280, 720).await?;
+  
+    // Custom size with headless mode
+    let mut browser = create_browser_with_config(false, 1920, 1080).await?;
     
-    // Navigate to target
+  // Navigate to target
     browser.navigate_to("https://example.com").await?;
     
     // Apply comprehensive bot bypass
