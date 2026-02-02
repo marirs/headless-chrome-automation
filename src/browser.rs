@@ -297,6 +297,39 @@ impl ChromeBrowser {
                             write.send(Message::Text(enable_runtime_request.to_string())).await?;
                             let _ = read.next().await; // Consume response
                             
+                            // Enable Input domain for mouse simulation
+                            let enable_input_request = json!({
+                                "id": 53,
+                                "method": "Input.enable",
+                                "sessionId": session_id
+                            });
+                            
+                            write.send(Message::Text(enable_input_request.to_string())).await?;
+                            
+                            // Read all responses until we get past the Input.enable response
+                            let mut input_enabled = false;
+                            while let Some(msg) = read.next().await {
+                                if let Ok(Message::Text(text)) = msg {
+                                    if let Ok(response) = serde_json::from_str::<serde_json::Value>(&text) {
+                                        // Check for Input.enable response
+                                        if let Some(id) = response.get("id").and_then(|v| v.as_u64()) {
+                                            if id == 53 {
+                                                input_enabled = true;
+                                                break;
+                                            }
+                                        }
+                                        // Check for Runtime.executionContextCreated notification
+                                        else if response.get("method").and_then(|m| m.as_str()) == Some("Runtime.executionContextCreated") {
+                                            continue; // Skip this notification
+                                        }
+                                        // If we've enabled Input and this is the script evaluation response, break
+                                        else if input_enabled && response.get("id").and_then(|v| v.as_u64()) == Some(52) {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
                             // Execute the script
                             let evaluate_request = json!({
                                 "id": 52,
@@ -771,6 +804,165 @@ impl ChromeBrowser {
         }
         
         Err(anyhow!("Failed to get response"))
+    }
+    
+    /// Simulate mouse movement to specific coordinates
+    pub async fn move_mouse_to(&mut self, x: f64, y: f64) -> Result<()> {
+        let session_id = self.session_id.clone();
+        
+        if let Some(session_id) = session_id {
+            let input_request = json!({
+                "id": 60,
+                "method": "Input.dispatchMouseEvent",
+                "params": {
+                    "type": "mouseMoved",
+                    "x": x,
+                    "y": y
+                },
+                "sessionId": session_id
+            });
+            
+            self.send_message(input_request).await?;
+        }
+        Ok(())
+    }
+
+    /// Simulate mouse click at specific coordinates
+    pub async fn click_at(&mut self, x: f64, y: f64) -> Result<()> {
+        let session_id = self.session_id.clone();
+        
+        if let Some(session_id) = session_id {
+            // Mouse down
+            let mouse_down_request = json!({
+                "id": 61,
+                "method": "Input.dispatchMouseEvent",
+                "params": {
+                    "type": "mousePressed",
+                    "x": x,
+                    "y": y,
+                    "button": "left",
+                    "clickCount": 1
+                },
+                "sessionId": session_id
+            });
+            
+            self.send_message(mouse_down_request).await?;
+            
+            // Small delay between down and up
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            
+            // Mouse up
+            let mouse_up_request = json!({
+                "id": 62,
+                "method": "Input.dispatchMouseEvent",
+                "params": {
+                    "type": "mouseReleased",
+                    "x": x,
+                    "y": y,
+                    "button": "left",
+                    "clickCount": 1
+                },
+                "sessionId": session_id
+            });
+            
+            self.send_message(mouse_up_request).await?;
+        }
+        Ok(())
+    }
+
+    /// Find element and click it with mouse simulation
+    pub async fn click_element(&mut self, selector: &str) -> Result<bool> {
+        let script = format!(r#"
+        (function() {{
+            const element = document.querySelector('{}');
+            if (element && element.offsetParent !== null) {{
+                const rect = element.getBoundingClientRect();
+                return {{
+                    found: true,
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2,
+                    width: rect.width,
+                    height: rect.height
+                }};
+            }}
+            return {{ found: false }};
+        }})()
+        "#, selector);
+
+        if let Ok(result) = self.execute_script(&script).await {
+            if let Ok(element_info) = serde_json::from_str::<serde_json::Value>(&result) {
+                if let Some(found) = element_info.get("found").and_then(|v| v.as_bool()) {
+                    if found {
+                        if let Some(x) = element_info.get("x").and_then(|v| v.as_f64()) {
+                            if let Some(y) = element_info.get("y").and_then(|v| v.as_f64()) {
+                                println!("🖱️  Clicking element at ({}, {})", x, y);
+                                self.move_mouse_to(x, y).await?;
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                self.click_at(x, y).await?;
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Find and click checkbox or radio button
+    pub async fn click_checkbox(&mut self, selector: &str) -> Result<bool> {
+        let script = format!(r#"
+        (function() {{
+            const element = document.querySelector('{}');
+            if (element && element.offsetParent !== null) {{
+                // Check if it's already checked
+                const wasChecked = element.checked;
+                
+                const rect = element.getBoundingClientRect();
+                return {{
+                    found: true,
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2,
+                    width: rect.width,
+                    height: rect.height,
+                    wasChecked: wasChecked,
+                    type: element.type || 'unknown'
+                }};
+            }}
+            return {{ found: false }};
+        }})()
+        "#, selector);
+
+        if let Ok(result) = self.execute_script(&script).await {
+            if let Ok(element_info) = serde_json::from_str::<serde_json::Value>(&result) {
+                if let Some(found) = element_info.get("found").and_then(|v| v.as_bool()) {
+                    if found {
+                        if let Some(x) = element_info.get("x").and_then(|v| v.as_f64()) {
+                            if let Some(y) = element_info.get("y").and_then(|v| v.as_f64()) {
+                                if let Some(was_checked) = element_info.get("wasChecked").and_then(|v| v.as_bool()) {
+                                    if let Some(element_type) = element_info.get("type").and_then(|v| v.as_str()) {
+                                        println!("🖱️  Clicking {} at ({}, {}) - was checked: {}", element_type, x, y, was_checked);
+                                        
+                                        // Move mouse to element
+                                        self.move_mouse_to(x, y).await?;
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+                                        
+                                        // Click the element
+                                        self.click_at(x, y).await?;
+                                        
+                                        // Wait a moment for the click to register
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                                        
+                                        return Ok(true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
     
     pub async fn quit(&mut self) -> Result<()> {
