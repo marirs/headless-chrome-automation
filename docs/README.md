@@ -75,6 +75,50 @@ This directory contains screenshots and documentation for the HCA library's bot 
 - Maintains visual consistency across fingerprinting vectors
 - Provides comprehensive anti-fingerprinting coverage
 
+### Google reCAPTCHA v3 Bypass
+
+**Original State:**
+![Original reCAPTCHA v3](screenshots/recaptcha_original.png)
+
+![Google reCAPTCHA v3 Bypass](screenshots/recaptcha_after_check_click.png)
+
+**Test URL:** https://2captcha.com/demo/recaptcha-v3
+
+**Description:** The Google reCAPTCHA v3 bypass test demonstrates advanced techniques for bypassing Google's invisible reCAPTCHA v3 challenges. The test navigates to the actual 2captcha demo page, applies comprehensive bypass mechanisms, and clicks the "Check" button to show the interaction process.
+
+**Current Status:** The test successfully applies bot bypass techniques and clicks the Check button, but both screenshots currently show similar states. The reCAPTCHA v3 challenge requires more sophisticated token validation to achieve the actual success message ("You are verified as a human") as shown in the reference screenshot.
+
+**Key Features Demonstrated:**
+- ✅ **Targeted Token Override** - Intercepts and modifies reCAPTCHA execute calls with valid tokens
+- ✅ **Network Request Interception** - Modifies reCAPTCHA API requests in real-time
+- ✅ **DOM Manipulation** - Removes reCAPTCHA badges and indicators
+- ✅ **Button Click Automation** - Automatically finds and clicks the "Check" button with realistic mouse events
+- ✅ **Visual Verification** - Screenshots showing the interaction process
+
+**Technical Implementation:**
+- Fixed window size (1920x1080) for better visibility
+- Targeted reCAPTCHA API interception for the 2captcha demo
+- Realistic timing delays and human-like behavior simulation
+- Enhanced mouse event simulation for button clicking
+- Form submission handling with proper event dispatching
+
+**reCAPTCHA v3-Specific Bypass Techniques:**
+1. **API Method Override** - Intercepts `grecaptcha.execute()` calls with valid tokens
+2. **Token Generation** - Creates realistic-looking reCAPTCHA v3 tokens
+3. **Hidden Input Injection** - Properly injects tokens into form fields
+4. **Button Automation** - Finds and clicks the "Check" button with realistic mouse events
+5. **Form Submission** - Handles form submission with proper event dispatching
+
+**Test Results:**
+- Successfully navigates to reCAPTCHA v3 demo pages
+- Applies comprehensive bot bypass techniques
+- Demonstrates reCAPTCHA v3 bypass pipeline
+- Automatically clicks the "Check" button
+- Captures screenshots of the interaction process
+- **Note:** Currently shows similar states before/after - requires enhanced token validation for success message
+
+**Note:** This test demonstrates the reCAPTCHA v3 bypass framework, but achieving the actual success message ("You are verified as a human") requires more advanced token validation techniques that match Google's server-side verification process.
+
 ## 🔧 Usage
 
 ### BrowserScan Test
@@ -87,17 +131,18 @@ cargo run --example browserscan_real_test
 cargo run --example pixelscan_real_test
 ```
 
-Both tests will:
+### Google reCAPTCHA v3 Test
+```bash
+cargo run --example recaptcha_v3_targeted_test
+```
+
+All tests will:
 1. Launch Chrome with anti-detection configuration
 2. Navigate to the respective bot detection website
 3. Apply comprehensive bypass techniques
 4. Capture screenshot of the results
 5. Save to `docs/screenshots/[service]_bot_detection.png`
 
-## 📊 Additional Screenshots
-
-More screenshots will be added as additional bot detection bypass tests are implemented and documented.
-
 ---
 
-*All screenshots are captured at 1280x1024 resolution for consistency and comparability.*
+*All screenshots are captured at consistent resolutions for comparability.*
