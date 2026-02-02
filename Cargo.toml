@@ -77,3 +77,19 @@ path = "examples/browserscan_bypass_test.rs"
 [[example]]
 name = "pixelscan_bypass_test"
 path = "examples/pixelscan_bypass_test.rs"
+
+[[example]]
+name = "bot_bypass_demo"
+path = "examples/bot_bypass_demo.rs"
+
+[[example]]
+name = "test_recaptcha"
+path = "examples/test_recaptcha.rs"
+
+[[example]]
+name = "debug_js"
+path = "examples/debug_js.rs"
+
+[[example]]
+name = "generate_screenshots"
+path = "examples/generate_screenshots.rs"
