@@ -223,23 +223,6 @@ Each bypass test provides detailed results including:
 📊 Confidence: 85.0%
 ```
 
-## 🛠️ Dependencies
-
-- `tokio` - Async runtime
-- `serde_json` - JSON serialization
-- `anyhow` - Error handling
-- `tracing` - Structured logging
-- `reqwest` - HTTP client
-- `base64` - Base64 encoding
-- `regex` - Regular expressions
-- `clap` - Command line parsing
-- `tokio-tungstenite` - WebSocket client for CDP
-- `futures-util` - Async utilities
-- `rand` - Random number generation
-- `tempfile` - Temporary file handling
-- `url` - URL parsing
-- `scraper` - HTML parsing
-
 ## 🏗️ Project Status: FULLY OPERATIONAL (CDP VERSION)
 
 ✅ **Core Features Working:**
@@ -265,24 +248,6 @@ Each bypass test provides detailed results including:
 - ✅ **Faster performance**
 - ✅ **Better control over Chrome instances**
 - ✅ **Self-contained solution**
-
-✅ **Ready for Distribution:**
-- Clean, maintainable codebase
-- Professional API design
-- Comprehensive documentation
-- Working examples
-- Visual documentation with screenshots
-
-## 📈 Performance Comparison
-
-| Feature | Rust Implementation | Java Implementation | Winner |
-|---------|-------------------|-------------------|--------|
-| Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Rust |
-| Memory Usage | ⭐⭐⭐⭐⭐ | ⭐⭐ | Rust |
-| Safety | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Rust |
-| Concurrency | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Rust |
-| Deployment | ⭐⭐⭐⭐⭐ | ⭐⭐ | Rust |
-| Bot Bypass | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Rust |
 
 ## 🤝 Support
 
