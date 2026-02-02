@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use std::process::Command;
 use std::time::Duration;
 use tokio::time::sleep;
-use reqwest::Client;
+use reqwest;
 use serde_json::json;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use futures_util::{SinkExt, StreamExt};
@@ -11,7 +11,6 @@ use base64::Engine;
 pub struct ChromeBrowser {
     pub process: std::process::Child,
     port: u16,
-    client: Client,
     websocket_url: String,
     target_id: Option<String>,
 }
@@ -70,7 +69,6 @@ impl ChromeBrowser {
             Ok(Self {
                 process: child,
                 port,
-                client: Client::new(),
                 websocket_url,
                 target_id: None,
             })
@@ -108,6 +106,10 @@ impl ChromeBrowser {
     
     pub async fn take_screenshot(&mut self, path: &str) -> Result<()> {
         if let Some(target_id) = &self.target_id {
+            // Connect to WebSocket once and reuse the connection
+            let (ws_stream, _) = connect_async(&self.websocket_url).await?;
+            let (mut write, mut read) = ws_stream.split();
+            
             // First attach to the target
             let attach_request = json!({
                 "id": 8,
@@ -118,51 +120,97 @@ impl ChromeBrowser {
                 }
             });
             
-            let attach_response = self.send_message(attach_request).await?;
+            write.send(Message::Text(attach_request.to_string())).await?;
             
-            if let Some(session_id) = attach_response.get("result").and_then(|r| r.get("sessionId")).and_then(|id| id.as_str()) {
-                // Enable Page domain
-                let enable_page_request = json!({
-                    "id": 9,
-                    "method": "Page.enable",
-                    "sessionId": session_id
-                });
-                
-                let _enable_response = self.send_message(enable_page_request).await?;
-                
-                // Take screenshot
-                let screenshot_request = json!({
-                    "id": 10,
-                    "method": "Page.captureScreenshot",
-                    "params": {
-                        "format": "png"
-                    },
-                    "sessionId": session_id
-                });
-                
-                let response = self.send_message(screenshot_request).await?;
-                
-                if let Some(result) = response.get("result") {
-                    if let Some(data) = result.get("data").and_then(|d| d.as_str()) {
-                        if let Ok(screenshot_bytes) = base64::engine::general_purpose::STANDARD.decode(data) {
-                            std::fs::write(path, screenshot_bytes)?;
-                            return Ok(());
+            // Read attach response
+            if let Some(msg) = read.next().await {
+                if let Ok(Message::Text(text)) = msg {
+                    if let Ok(attach_response) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if let Some(session_id) = attach_response.get("params").and_then(|r| r.get("sessionId")).and_then(|id| id.as_str()) {
+                            // Enable Page domain
+                            let enable_page_request = json!({
+                                "id": 9,
+                                "method": "Page.enable",
+                                "sessionId": session_id
+                            });
+                            
+                            write.send(Message::Text(enable_page_request.to_string())).await?;
+                            
+                            // Read enable response (ignore it)
+                            let _ = read.next().await;
+                            
+                            // Take screenshot
+                            let screenshot_request = json!({
+                                "id": 10,
+                                "method": "Page.captureScreenshot",
+                                "params": {
+                                    "format": "png"
+                                },
+                                "sessionId": session_id
+                            });
+                            
+                            write.send(Message::Text(screenshot_request.to_string())).await?;
+                            
+                            // Read screenshot response
+                            if let Some(msg) = read.next().await {
+                                if let Ok(Message::Text(text)) = msg {
+                                    if let Ok(response) = serde_json::from_str::<serde_json::Value>(&text) {
+                                        // Check if this is the Page.enable response or the screenshot response
+                                        if response.get("result").map_or(false, |r| r.as_object().map_or(false, |obj| obj.is_empty())) {
+                                            // Read the next message (the actual screenshot response)
+                                            if let Some(msg2) = read.next().await {
+                                                if let Ok(Message::Text(text2)) = msg2 {
+                                                    if let Ok(screenshot_response) = serde_json::from_str::<serde_json::Value>(&text2) {
+                                                        if let Some(result) = screenshot_response.get("result") {
+                                                            if let Some(data) = result.get("data").and_then(|d| d.as_str()) {
+                                                                if let Ok(screenshot_bytes) = base64::engine::general_purpose::STANDARD.decode(data) {
+                                                                    std::fs::write(path, screenshot_bytes)?;
+                                                                    return Ok(());
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                        if let Some(error) = screenshot_response.get("error") {
+                                                            return Err(anyhow!("Screenshot error: {}", error));
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // This is the screenshot response
+                                            if let Some(result) = response.get("result") {
+                                                if let Some(data) = result.get("data").and_then(|d| d.as_str()) {
+                                                    if let Ok(screenshot_bytes) = base64::engine::general_purpose::STANDARD.decode(data) {
+                                                        std::fs::write(path, screenshot_bytes)?;
+                                                        return Ok(());
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if let Some(error) = response.get("error") {
+                                                return Err(anyhow!("Screenshot error: {}", error));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            return Err(anyhow!("Failed to get session ID from attach response"));
                         }
                     }
-                }
-                
-                // If we get here, try to get any error information
-                if let Some(error) = response.get("error") {
-                    return Err(anyhow!("Screenshot error: {}", error));
                 }
             }
         }
         
-        Err(anyhow!("Failed to take screenshot"))
+        Err(anyhow!("Failed to take screenshot - no target ID"))
     }
     
     pub async fn execute_script(&mut self, script: &str) -> Result<String> {
         if let Some(target_id) = &self.target_id {
+            // Connect to WebSocket once and reuse the connection
+            let (ws_stream, _) = connect_async(&self.websocket_url).await?;
+            let (mut write, mut read) = ws_stream.split();
+            
             // First attach to the target
             let attach_request = json!({
                 "id": 5,
@@ -173,49 +221,66 @@ impl ChromeBrowser {
                 }
             });
             
-            let attach_response = self.send_message(attach_request).await?;
+            write.send(Message::Text(attach_request.to_string())).await?;
             
-            if let Some(session_id) = attach_response.get("result").and_then(|r| r.get("sessionId")).and_then(|id| id.as_str()) {
-                // Enable Runtime domain
-                let enable_runtime_request = json!({
-                    "id": 6,
-                    "method": "Runtime.enable",
-                    "sessionId": session_id
-                });
-                
-                let _enable_response = self.send_message(enable_runtime_request).await?;
-                
-                // Execute the script
-                let evaluate_request = json!({
-                    "id": 7,
-                    "method": "Runtime.evaluate",
-                    "params": {
-                        "expression": script,
-                        "returnByValue": true,
-                        "awaitPromise": true
-                    },
-                    "sessionId": session_id
-                });
-                
-                let response = self.send_message(evaluate_request).await?;
-                
-                if let Some(result) = response.get("result") {
-                    if let Some(value) = result.get("value") {
-                        if let Some(text) = value.as_str() {
-                            return Ok(text.to_string());
-                        } else if let Some(num) = value.as_f64() {
-                            return Ok(num.to_string());
-                        } else if let Some(bool) = value.as_bool() {
-                            return Ok(bool.to_string());
-                        } else if value.is_null() {
-                            return Ok("null".to_string());
+            // Read attach response
+            if let Some(msg) = read.next().await {
+                if let Ok(Message::Text(text)) = msg {
+                    if let Ok(attach_response) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if let Some(session_id) = attach_response.get("params").and_then(|r| r.get("sessionId")).and_then(|id| id.as_str()) {
+                            // Enable Runtime domain
+                            let enable_runtime_request = json!({
+                                "id": 6,
+                                "method": "Runtime.enable",
+                                "sessionId": session_id
+                            });
+                            
+                            write.send(Message::Text(enable_runtime_request.to_string())).await?;
+                            
+                            // Read enable response (ignore it)
+                            let _ = read.next().await;
+                            
+                            // Execute the script
+                            let evaluate_request = json!({
+                                "id": 7,
+                                "method": "Runtime.evaluate",
+                                "params": {
+                                    "expression": script,
+                                    "returnByValue": true,
+                                    "awaitPromise": true
+                                },
+                                "sessionId": session_id
+                            });
+                            
+                            write.send(Message::Text(evaluate_request.to_string())).await?;
+                            
+                            // Read evaluation response
+                            if let Some(msg) = read.next().await {
+                                if let Ok(Message::Text(text)) = msg {
+                                    if let Ok(response) = serde_json::from_str::<serde_json::Value>(&text) {
+                                        if let Some(result) = response.get("result") {
+                                            if let Some(value) = result.get("value") {
+                                                if let Some(text) = value.as_str() {
+                                                    return Ok(text.to_string());
+                                                } else if let Some(num) = value.as_f64() {
+                                                    return Ok(num.to_string());
+                                                } else if let Some(bool) = value.as_bool() {
+                                                    return Ok(bool.to_string());
+                                                } else if value.is_null() {
+                                                    return Ok("null".to_string());
+                                                }
+                                            }
+                                        }
+                                        
+                                        // If we get here, try to get any error information
+                                        if let Some(error) = response.get("error") {
+                                            return Err(anyhow!("JavaScript execution error: {}", error));
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                }
-                
-                // If we get here, try to get any error information
-                if let Some(error) = response.get("error") {
-                    return Err(anyhow!("JavaScript execution error: {}", error));
                 }
             }
         }

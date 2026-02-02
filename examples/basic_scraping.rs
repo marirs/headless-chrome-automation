@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
     let mut browser = ChromeBrowser::new(true).await?;
 
     // Navigate to a test website
-    browser.navigate_to("data:text/html,<html><head><title>Test Page</title></head><body><h1>Hello World</h1><a href='https://example.com'>Link</a></body></html>").await?;
+    browser.navigate_to("https://www.google.com").await?;
 
     // Wait a moment for the page to load
     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
@@ -29,8 +29,8 @@ async fn main() -> Result<()> {
     println!("\nFound {} links", content.links.len());
     println!("Found {} images", content.images.len());
 
-    // Take a screenshot (commented out for now)
-    // browser.take_screenshot("google_screenshot.png").await?;
+    // Take a screenshot
+    browser.take_screenshot("google_screenshot.png").await?;
 
     // Close browser
     browser.quit().await?;

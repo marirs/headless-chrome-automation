@@ -23,33 +23,15 @@ impl<'a> WebScraper<'a> {
         // Wait a moment for the page to fully load
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         
-        // Get page title
-        let title_script = r#"
-        (function() {
-            if (document.title) {
-                return document.title;
-            } else if (document.querySelector('title')) {
-                return document.querySelector('title').textContent;
-            } else {
-                return 'No title found';
-            }
-        })()
-        "#;
+        // Use a simple script that should work
+        let title_script = r#"document.title"#;
         let title = self.browser.execute_script(title_script).await?;
         
-        // Get page body
-        let body_script = r#"
-        (function() {
-            if (document.body) {
-                return document.body.innerText || document.body.textContent || 'No body content';
-            } else {
-                return 'No body found';
-            }
-        })()
-        "#;
+        // Use a simple script for body content
+        let body_script = r#"document.body ? document.body.innerText : 'No body found'"#;
         let body = self.browser.execute_script(body_script).await?;
         
-        // Get all links
+        // Use simple scripts for links and images
         let links_script = r#"
         (function() {
             var links = [];
@@ -67,7 +49,6 @@ impl<'a> WebScraper<'a> {
         let links_result = self.browser.execute_script(links_script).await?;
         let links: Vec<String> = serde_json::from_str(&links_result).unwrap_or_default();
         
-        // Get all images
         let images_script = r#"
         (function() {
             var images = [];
@@ -85,7 +66,6 @@ impl<'a> WebScraper<'a> {
         let images_result = self.browser.execute_script(images_script).await?;
         let images: Vec<String> = serde_json::from_str(&images_result).unwrap_or_default();
         
-        // Get all forms
         let forms_script = r#"
         (function() {
             var forms = [];
