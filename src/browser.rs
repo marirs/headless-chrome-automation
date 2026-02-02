@@ -52,6 +52,8 @@ impl ChromeBrowser {
                 "--disable-sync".to_string(),
                 "--disable-default-browser-check".to_string(),
                 "--disable-features=TranslateUI,BlinkGenPropertyTrees".to_string(),
+                "--window-size=1280,1024".to_string(),
+                "--force-device-scale-factor=1".to_string(),
                 "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36".to_string(),
                 "about:blank".to_string(),
             ])
