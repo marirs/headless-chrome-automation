@@ -1,0 +1,79 @@
+[package]
+name = "hca"
+version = "0.1.0"
+edition = "2021"
+authors = ["SG <marirs@gmail.com>"]
+description = "A Rust library for headless Chrome automation and web scraping"
+license = "MIT"
+repository = "https://github.com/marirs/headless-chrome-automation"
+keywords = ["chrome", "automation", "headless", "scraping", "bot-detection"]
+categories = ["web-programming", "api-bindings"]
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+url = "2.5"
+scraper = "0.20"
+reqwest = { version = "0.12", features = ["json"] }
+clap = { version = "4.0", features = ["derive"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+base64 = "0.22"
+rand = "0.8"
+tempfile = "3.12"
+regex = "1.11"
+
+[features]
+default = []
+
+[lib]
+name = "hca"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hca-cli"
+path = "src/main.rs"
+
+[[example]]
+name = "basic_demo"
+path = "examples/basic_demo.rs"
+
+[[example]]
+name = "basic_scraping"
+path = "examples/basic_scraping.rs"
+
+[[example]]
+name = "form_automation"
+path = "examples/form_automation.rs"
+
+[[example]]
+name = "screenshot"
+path = "examples/screenshot.rs"
+
+[[example]]
+name = "library_test"
+path = "examples/library_test.rs"
+
+[[example]]
+name = "form_automation_test"
+path = "examples/form_automation_test.rs"
+
+[[example]]
+name = "recaptcha_bypass_test"
+path = "examples/recaptcha_bypass_test.rs"
+
+[[example]]
+name = "cloudflare_bypass_test"
+path = "examples/cloudflare_bypass_test.rs"
+
+[[example]]
+name = "browserscan_bypass_test"
+path = "examples/browserscan_bypass_test.rs"
+
+[[example]]
+name = "pixelscan_bypass_test"
+path = "examples/pixelscan_bypass_test.rs"
